@@ -20,7 +20,7 @@ from astropy.io import ascii
 from astropy.wcs import WCS
 from numpy import ndarray
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 from scipy import stats
 import scipy.interpolate as interp
@@ -82,8 +82,9 @@ def rdfits(image):
     #Depending on compression type
     try:
         hdulist =  fits.open(image)
-        header= hdulist[1]._header
-        data = hdulist[1].data
+        #header= hdulist[1]._header
+        #data = hdulist[1].data
+        # QY 01/27/2022: commenting this out because it messed up with Xingming-redux
  
     except:
         hdulist =  fits.open(image)
