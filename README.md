@@ -1,6 +1,16 @@
 
 # ZiP 
 
+## Modification for XMO
+
+Quanzhi Ye, 03/10/2022
+
+* Due to [a bug in multiprocessing](https://github.com/GOTO-OBS/ZiP/issues/9), this (as of version 1.6.3) needs to be run under python=3.5.
+* Removed importing matplotlib as conda under python=3.5 has trouble resolving conflicts.
+* Edited `zogyp/zip.py` to resolve a conflict with XMO's redux.
+
+## README by original author, Ry Cutter
+
 To install:
 
 ~~~
