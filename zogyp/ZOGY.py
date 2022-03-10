@@ -9,7 +9,7 @@ import glob
 import ntpath
 import time
 import shutil
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from astropy.io import fits
 import numpy as np
 
