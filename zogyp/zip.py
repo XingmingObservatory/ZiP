@@ -1,29 +1,16 @@
 import math
 import glob
 import os
-import shutil
 import multiprocessing
 import multiprocessing.pool
-from multiprocessing import Pool
-import sys
-import inspect
-import time
-from random import randint
 import subprocess
-from itertools import product
 
 import sep
 from astropy.nddata.utils import Cutout2D as cut
-from astropy.convolution import convolve
 from astropy.io import fits
 from astropy.io import ascii
 from astropy.wcs import WCS
-from numpy import ndarray
 import numpy as np
-#import matplotlib.pyplot as plt
-from matplotlib.font_manager import FontProperties
-from scipy import stats
-import scipy.interpolate as interp
 from scipy import ndimage
 try:
     import pyfftw.interfaces.numpy_fft as fft
@@ -80,16 +67,9 @@ def rdfits(image):
     This function remakes the fits files so they are
     """
     #Depending on compression type
-    try:
-        hdulist =  fits.open(image)
-        #header= hdulist[1]._header
-        #data = hdulist[1].data
-        # QY 01/27/2022: commenting this out because it messed up with Xingming-redux
- 
-    except:
-        hdulist =  fits.open(image)
-        header= hdulist[0].header
-        data = hdulist[0].data
+    hdulist =  fits.open(image)
+    header= hdulist[0].header
+    data = hdulist[0].data
 
     image_RD = image.replace('.fits', '_RD.fits')
     fits.writeto(image_RD, data, header, overwrite=True)
@@ -133,7 +113,7 @@ def get_psf(image):
     """
 
     sexcat = image.replace('.fits', '_PSFCAT.fits')
-    sexcat = sexcat.replace('./Zoutput/','') 
+    #sexcat = sexcat.replace('./Zoutput/','') 
     talk = [sex ,image,'-c',root_config+'/default.sex' , '-CATALOG_NAME' , sexcat,
            '-PARAMETERS_NAME', root_config+'/default.param', '-STARNNW_NAME', 
            root_config+'/default.nnw', '-FILTER_NAME', root_config+'/default.conv']
@@ -331,8 +311,6 @@ def get_fratio(psfcat_sci, psfcat_ref, sexcat_sci, sexcat_ref):
     y_ref_match = []
     dx = []
     dy = []
-    dra_match = []
-    ddec_match = []
     fratio = []
     nmatch = 0
     for i_sci in range(len(x_sci)):
@@ -370,6 +348,7 @@ def imprep(sci_im, ref_im, chopx, chopy, inject = False, lineup = False):
     # F = glob.glob('./Zoutput/*')
     # for fil in F:
     #  subprocess.call(['rm', fil])
+    file_prefix = os.path.splitext(sci_im)[0]
 
     # This part formats the files to guarentee the other programs can use them#
     name1 = rdfits(sci_im)
@@ -436,7 +415,7 @@ def imprep(sci_im, ref_im, chopx, chopy, inject = False, lineup = False):
             CUT2 = cut(sci_data, (CC[i][0], CC[i][1]), (Yfrac, Xfrac))
 
         hdu = fits.PrimaryHDU(CUT.data, header=CUT.wcs.to_header())
-        hdu.writeto('Zoutput/ref_cut%s.fits' %(i+1), overwrite=True)
+        hdu.writeto(file_prefix + '_ref_cut%s.fits' %(i+1), overwrite=True)
         hdu = fits.PrimaryHDU(CUT2.data, header=CUT2.wcs.to_header())
         try:
             hdu.header['DATE2'] = headerA['DATE-OBS']
@@ -444,9 +423,9 @@ def imprep(sci_im, ref_im, chopx, chopy, inject = False, lineup = False):
             hdu.header['INST']= headerA['INSTRUME']
             hdu.header['REF-ID'] = header['RUN-ID']
             hdu.header['INST2']= header['INSTRUME']
-            hdu.writeto('Zoutput/sci_cut%s.fits' %(i+1), overwrite=True)
+            hdu.writeto(file_prefix + '_sci_cut%s.fits' %(i+1), overwrite=True)
         except:
-            hdu.writeto('Zoutput/sci_cut%s.fits' %(i+1), overwrite=True)
+            hdu.writeto(file_prefix + '_sci_cut%s.fits' %(i+1), overwrite=True)
     return(None)
 #####################################################################################################################
 
@@ -570,6 +549,7 @@ def finp(image, name, xslice, yslice, clean_sci, clean_ref, blackout):
     """
 
     sci = image.replace('ref', 'sci')
+    file_prefix = os.path.splitext(image)[0]
 
     #Parallell PSF modelling
     with multiprocessing.Pool(2) as p:
@@ -581,7 +561,8 @@ def finp(image, name, xslice, yslice, clean_sci, clean_ref, blackout):
     x_fratio, y_fratio, fratio, dx, dy = get_fratio(psfcat1, psfcat2, sexcat1, sexcat2)
     FM = np.median(fratio)
 
-    fnum = image.replace('./Zoutput/ref_cut','')
+    #fnum = image.replace(file_prefix + '_ref_cut','')
+    fnum = image.split('_ref_cut')[-1]
     fnum2= fnum.replace('.fits','')
 
     f_new = 1.0
@@ -596,7 +577,6 @@ def finp(image, name, xslice, yslice, clean_sci, clean_ref, blackout):
     dat = hdu[0].data
     dat = dat.byteswap().newbyteorder()
     head = hdu[0].header
-    W = WCS(head)
     bkg = sep.Background(dat, bw = 16, bh =16)
     stdb = bkg.rms()
 
@@ -610,8 +590,6 @@ def finp(image, name, xslice, yslice, clean_sci, clean_ref, blackout):
     if blackout == True: #remove data where there is no overlap
         dat2[dat==0] = 0
   	    		 
-    head2 = hdu2[0].header
-    W2 = WCS(head)
     bkg2 = sep.Background(dat2, bw =16, bh = 16)
     stdb2 = bkg2.rms()
 
@@ -655,18 +633,18 @@ def finp(image, name, xslice, yslice, clean_sci, clean_ref, blackout):
     Scorr_img = restitcher(sub_dat, data_Sc, xslice, yslice)
 
     hdu = fits.PrimaryHDU(D_img, header=head )
-    hdu.writeto('./Zoutput/'+name+'_D'+fnum ,overwrite=True)
+    hdu.writeto(file_prefix + '_'+name+'_D'+fnum ,overwrite=True)
 
     hdu = fits.PrimaryHDU(S_img, header=head)
-    hdu.writeto('./Zoutput/'+name+'_S'+fnum ,overwrite=True)
+    hdu.writeto(file_prefix + '_'+name+'_S'+fnum ,overwrite=True)
 
     hdu = fits.PrimaryHDU(Scorr_img, header=head)
-    hdu.writeto('./Zoutput/'+name+'_Scorr'+fnum ,overwrite=True)
+    hdu.writeto(file_prefix + '_'+name+'_Scorr'+fnum ,overwrite=True)
 
-    subprocess.call(['rm', 'sci_cut%s_PSFCAT.psf' %(fnum2), 
-                     'sci_cut%s.psfexcat' %(fnum2), 'sci_cut%s_PSFCAT.fits' %(fnum2)])
-    subprocess.call(['rm', 'ref_cut%s_PSFCAT.psf' %(fnum2), 
-                    'ref_cut%s.psfexcat' %(fnum2), 'ref_cut%s_PSFCAT.fits' %(fnum2)])
+    #subprocess.call(['rm',  '%s_sci_cut%s_PSFCAT.psf' %(file_prefix[:-9], fnum2), 
+    #                 '%s_sci_cut%s.psfexcat' %(file_prefix[:-9], fnum2), '%s_sci_cut%s_PSFCAT.fits' %(file_prefix[:-9], fnum2)])
+    #subprocess.call(['rm', '%s_ref_cut%s_PSFCAT.psf' %(file_prefix[:-9], fnum2), 
+    #                '%s_ref_cut%s.psfexcat' %(file_prefix[:-9], fnum2), '%s_ref_cut%s_PSFCAT.fits' %(file_prefix[:-9], fnum2)])
 
     return(None)
 ####################################################################################################################
@@ -674,7 +652,7 @@ def finp(image, name, xslice, yslice, clean_sci, clean_ref, blackout):
 
 ###################################################################################################################
 def run_ZOGY(sci_im, ref_im, outname = 'data', xslice = 1, yslice = 1, 
-             align = False, clean_sci = 0.75,clean_ref = 0.75, 
+             align = False, clean_sci = 0.25,clean_ref = 0.25, 
              sub_imagex = 1, sub_imagey =1, blackout = False):
 
 
@@ -683,18 +661,25 @@ def run_ZOGY(sci_im, ref_im, outname = 'data', xslice = 1, yslice = 1,
 
     Only create sub_image if PSF variation over the field can't be modelled with a 3rd order polynomial
     or you are trying to reduce computation time. (The PSF model will degrade if this is used)
+    
+    QY 03/10/2022: changed file organization to enable multiple instances
     """
  
      #      Make directory suitable       #
     #######################################
-    if os.path.isdir('./Zoutput') == False:
-        os.makedirs('./Zoutput')
-        print('Output directory made!')
-    else:
-    	  for fil in glob.glob('./Zoutput/sci_cut*'):
-    	      subprocess.call(['rm', fil])
-    	  for fil in glob.glob('./Zoutput/ref_cut*'):
-    	      subprocess.call(['rm', fil])
+    #if os.path.isdir('./Zoutput') == False:
+    #    os.makedirs('./Zoutput')
+    #    print('Output directory made!')
+    #else:
+    # 	  for fil in glob.glob('./Zoutput/sci_cut*'):
+    # 	      subprocess.call(['rm', fil])
+    # 	  for fil in glob.glob('./Zoutput/ref_cut*'):
+    # 	      subprocess.call(['rm', fil])
+    file_prefix = os.path.splitext(sci_im)[0]
+    for fil in glob.glob(file_prefix + '_sci_cut*'):
+        subprocess.call(['rm', fil])
+    for fil in glob.glob(file_prefix + '_ref_cut*'):
+ 	    subprocess.call(['rm', fil])
     ########################################
 
     x = multiprocessing.cpu_count()
@@ -702,7 +687,7 @@ def run_ZOGY(sci_im, ref_im, outname = 'data', xslice = 1, yslice = 1,
         print('Serial version')
         ncores = x
         imprep(sci_im, ref_im, sub_imagex, sub_imagey, lineup = align)
-        refs = glob.glob('./Zoutput/ref_cut*.fits')
+        refs = glob.glob(file_prefix + '_ref_cut*.fits')
         for SLICE in refs:
             finp(SLICE, outname, xslice, yslice, clean_sci, clean_ref, blackout)
     else:
@@ -712,7 +697,7 @@ def run_ZOGY(sci_im, ref_im, outname = 'data', xslice = 1, yslice = 1,
             ncores = (int(x/3))
         print('Parallell version, using %s cores' %(ncores*3))
         imprep(sci_im, ref_im, sub_imagex, sub_imagey, lineup = align)
-        refs = glob.glob('./Zoutput/ref_cut*.fits')
+        refs = glob.glob(file_prefix + '_ref_cut*.fits')
         p = NoDaemonProcessPool(processes = ncores)
         p.starmap(finp, [([R] + [outname, xslice, yslice, clean_sci, clean_ref, blackout])for R in refs])
         p.close()

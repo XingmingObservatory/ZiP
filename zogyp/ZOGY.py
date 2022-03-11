@@ -5,13 +5,6 @@ This script is to make the program executable in the shell
 """
 
 import sys
-import glob
-import ntpath
-import time
-import shutil
-#import matplotlib.pyplot as plt
-from astropy.io import fits
-import numpy as np
 
 #ZOGY in Parallel routines
 from zogyp.zip import run_ZOGY
@@ -33,10 +26,11 @@ def main():
 
     if len(sys.argv) == 1:
         print('~~~~~  ZOGY in Parallel ~~~~~')
-        print('~           V1.6.3          ~')
+        print('~          V1.6.3.1         ~')
         print('-----------------------------')
         print(' ')
         print('          Ry Cutter          ')
+        print('   Modified by Quanzhi Ye    ')
         print(' ')
         print(' ')
         print('Type: "ZOGY -help" for list of inputs')
@@ -44,10 +38,11 @@ def main():
 
     elif sys.argv[1] == '-help':
         print('~~~~~  ZOGY in Parallel ~~~~~')
-        print('~           V1.6.3          ~')
+        print('~          V1.6.3.1         ~')
         print('-----------------------------')
         print(' ')
         print('          Ry Cutter          ')
+        print('   Modified by Quanzhi Ye    ')
         print(' ')
         print(' ')
         print('To use, type:')
